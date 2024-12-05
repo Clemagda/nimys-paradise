@@ -2,6 +2,7 @@ import streamlit as st
 import boto3
 from botocore.exceptions import NoCredentialsError
 import os
+
 # Configuration AWS
 BUCKET_NAME = 'filmographiepersonono'
 
@@ -13,8 +14,7 @@ def list_s3_files(bucket_name):
         's3',
         aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
         aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-        region_name=os.getenv('AWS_DEFAULT_REGION',
-                              'eu-west-3')
+        region_name=os.getenv('AWS_DEFAULT_REGION', 'eu-west-3')
     )
     try:
         response = s3_client.list_objects_v2(Bucket=bucket_name)
@@ -49,24 +49,35 @@ def generate_presigned_url(bucket_name, object_key, expiration=3600):
 
 
 # Interface Streamlit
-st.title("Catalogue de Films")
+st.markdown(
+    "<h1 style='text-align: center; color: #FF5733;'>🎬 A la carte </h1>",
+    unsafe_allow_html=True
+)
 
-# Récupération de la liste des fichiers
-st.write("Chargement de la liste des films...")
+# Barre de recherche
+search = st.text_input("🔍 Rechercher un film (partie du nom)", "")
+
 files = list_s3_files(BUCKET_NAME)
 
 if files:
+    # Filtrer les fichiers en fonction de la recherche
+    if search:
+        files = [file for file in files if search.lower() in file.lower()]
+        if not files:
+            st.warning("Aucun film trouvé pour votre recherche.")
+
+    # Affichage des films sous forme de cartes
     for file in files:
-        col1, col2 = st.columns([4, 1])
-        col1.write(file)  # Nom du fichier
-        # Génération du lien de téléchargement
         url = generate_presigned_url(BUCKET_NAME, file)
         if url:
-            col2.markdown(
-                f'<a href="{url}" download="{
-                    file}" target="_blank" style="text-decoration: none; color: blue;">'
-                f'📥 Télécharger</a>',
+            st.markdown(
+                f"""
+                <div style='border: 2px solid #FF5733; padding: 10px; border-radius: 10px; margin-bottom: 10px; background-color: #333333;'>
+                    <h4 style='color: #FFFFFF;'>🎥 {file}</h4>
+                    <a href="{url}" target="_blank" style='text-decoration: none; color: white; background: #007BFF; padding: 8px 12px; border-radius: 5px;'>📥 Télécharger</a>
+                </div>
+                """,
                 unsafe_allow_html=True
             )
 else:
-    st.write("Aucun fichier trouvé dans le bucket.")
+    st.error("Aucun fichier trouvé dans le bucket.")
