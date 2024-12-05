@@ -1,7 +1,7 @@
 import streamlit as st
 import boto3
 from botocore.exceptions import NoCredentialsError
-
+import os
 # Configuration AWS
 BUCKET_NAME = 'filmographiepersonono'
 
@@ -9,7 +9,13 @@ BUCKET_NAME = 'filmographiepersonono'
 
 
 def list_s3_files(bucket_name):
-    s3_client = boto3.client('s3', region_name='eu-west-3')
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=os.getenv('AWS_DEFAULT_REGION',
+                              'eu-west-3')
+    )
     try:
         response = s3_client.list_objects_v2(Bucket=bucket_name)
         if 'Contents' in response:
@@ -24,7 +30,13 @@ def list_s3_files(bucket_name):
 
 
 def generate_presigned_url(bucket_name, object_key, expiration=3600):
-    s3_client = boto3.client('s3', region_name='eu-west-3')
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=os.getenv('AWS_DEFAULT_REGION',
+                              'eu-west-3')  # Région par défaut
+    )
     try:
         return s3_client.generate_presigned_url(
             'get_object',
@@ -51,7 +63,8 @@ if files:
         url = generate_presigned_url(BUCKET_NAME, file)
         if url:
             col2.markdown(
-                f'<a href="{url}" download="{file}" target="_blank" style="text-decoration: none; color: blue;">'
+                f'<a href="{url}" download="{
+                    file}" target="_blank" style="text-decoration: none; color: blue;">'
                 f'📥 Télécharger</a>',
                 unsafe_allow_html=True
             )
