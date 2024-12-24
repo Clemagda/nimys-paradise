@@ -2,6 +2,7 @@ import streamlit as st
 import boto3
 from botocore.exceptions import NoCredentialsError
 import os
+import json
 
 # Configuration AWS
 BUCKET_NAME = 'filmographiepersonono'
@@ -44,9 +45,26 @@ def generate_presigned_url(bucket_name, object_key, expiration=3600):
             ExpiresIn=expiration
         )
     except Exception as e:
-        st.error(f"Erreur lors de la génération du lien : {e}")
+        st.error("Erreur lors de la génération du lien : " + str(e))
         return None
 
+# Fonction pour charger et enregistrer l'état des "films vus"
+
+
+def load_seen_movies():
+    if os.path.exists("seen_movies.json"):
+        with open("seen_movies.json", "r") as file:
+            return json.load(file)
+    return {}
+
+
+def save_seen_movies(seen_movies):
+    with open("seen_movies.json", "w") as file:
+        json.dump(seen_movies, file)
+
+
+# Charger l'état initial des films vus
+seen_movies = load_seen_movies()
 
 # Interface Streamlit
 st.markdown(
@@ -74,67 +92,94 @@ if files:
             url = generate_presigned_url(BUCKET_NAME, file)
             if url:
                 with cols[i % 5]:
-                    # Affichage du nom du fichier
                     st.markdown("📽️ **" + file + "**")
-                    
-                    # Génération du bouton de téléchargement
-                    link = (
-                        '<a href="' + url +
-                        '" target="_blank" style="text-decoration: none; color: white; background: #007BFF; padding: 8px 12px; border-radius: 5px; display: inline-block; text-align: center;">📥 Télécharger</a>'
-                    )
-                    st.markdown(link, unsafe_allow_html=True)
+                    if file.endswith(('.mp4', '.mkv')):
+                        st.markdown(
+                            '<a href="' + url + '" target="_blank" style="text-decoration: none; color: white; background: #28a745; padding: 8px 12px; border-radius: 5px;">▶️ Visionner</a>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            '<a href="' + url + '" download style="text-decoration: none; color: white; background: #007BFF; padding: 8px 12px; border-radius: 5px;">📥 Télécharger</a>',
+                            unsafe_allow_html=True
+                        )
 
     # Affichage des films sous forme de liste
     st.markdown("### 🎥 Tous les films")
     with st.container():
-            scroll_style = """
-                <style>
-                .scrollable-container {
-                    max-height: 400px;
-                    overflow-y: auto;
-                    border: 1px solid #333;
-                    padding: 10px;
-                    border-radius: 10px;
-                    background-color: #202020;
-                }
-                .film-item {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 8px 0;
-                    border-bottom: 1px solid #444;
-                }
-                .film-item:last-child {
-                    border-bottom: none;
-                }
-                .download-btn {
-                    text-decoration: none;
-                    color: #FFFFFF; /* Couleur blanche pour le texte */
-                    background: #0056B3; /* Bleu plus foncé pour améliorer le contraste */
-                    padding: 10px 15px; /* Augmente le padding pour rendre le bouton plus grand */
-                    border-radius: 5px;
-                    font-size: 14px; /* Augmente la taille du texte */
-                    font-weight: bold; /* Rend le texte plus gras */
-                    display: inline-block;
-                    text-align: center;
-                }
-                .download-btn:hover {
-                    background: #007BFF; /* Couleur légèrement plus claire au survol */
-                }
-                </style>
-            """
-            st.markdown(scroll_style, unsafe_allow_html=True)
-            st.markdown('<div class="scrollable-container">', unsafe_allow_html=True)
-            for file in files:
-                url = generate_presigned_url(BUCKET_NAME, file)
-                if url:
-                    item = (
-                        '<div class="film-item">'
-                        '<span>📽️ ' + file + '</span>'
-                        '<a class="download-btn" href="' + url + '" target="_blank">📥 Télécharger</a>'
-                        '</div>'
-                    )
-                    st.markdown(item, unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        scroll_style = """
+            <style>
+            .scrollable-container {
+                max-height: 400px;
+                overflow-y: auto;
+                border: 1px solid #333;
+                padding: 10px;
+                border-radius: 10px;
+                background-color: #202020;
+            }
+            .film-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 0;
+                border-bottom: 1px solid #444;
+            }
+            .film-item:last-child {
+                border-bottom: none;
+            }
+            .checkbox {
+                margin-right: 10px;
+            }
+            .film-title {
+                display: flex;
+                align-items: center;
+            }
+            .download-btn {
+                text-decoration: none;
+                color: #FFFFFF; /* Couleur blanche pour le texte */
+                background: #0056B3; /* Bleu plus foncé pour améliorer le contraste */
+                padding: 10px 15px; /* Augmente le padding pour rendre le bouton plus grand */
+                border-radius: 5px;
+                font-size: 14px; /* Augmente la taille du texte */
+                font-weight: bold; /* Rend le texte plus gras */
+                display: inline-block;
+                text-align: center;
+            }
+            .download-btn:hover {
+                background: #007BFF; /* Couleur légèrement plus claire au survol */
+            }
+            </style>
+        """
+        st.markdown(scroll_style, unsafe_allow_html=True)
+        st.markdown('<div class="scrollable-container">',
+                    unsafe_allow_html=True)
+        for file in files:
+            url = generate_presigned_url(BUCKET_NAME, file)
+            if url:
+                # Ajout d'une case à cocher alignée avec le titre du film
+                st.markdown('<div class="film-item">', unsafe_allow_html=True)
+                col1, col2 = st.columns([0.1, 0.9])
+                with col1:
+                    checkbox = st.checkbox("", value=seen_movies.get(
+                        file, False), key=file, help="Marquer comme vu")
+                    seen_movies[file] = checkbox
+                with col2:
+                    st.markdown('<span class="film-title">📽️ ' +
+                                file + '</span>', unsafe_allow_html=True)
+                    if file.endswith(('.mp4', '.mkv')):
+                        st.markdown(
+                            '<a class="download-btn" href="' + url + '" target="_blank">▶️ Visionner</a>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            '<a class="download-btn" href="' + url + '" download>📥 Télécharger</a>',
+                            unsafe_allow_html=True
+                        )
+                st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Sauvegarder l'état des films vus
+    save_seen_movies(seen_movies)
 else:
-    st.error("fin")
+    st.error("Aucun fichier trouvé dans le bucket.")
